@@ -5,6 +5,7 @@ from openai import AzureOpenAI
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.core.configuration import Configuration
 
 # Load secret environment keys locally
 load_dotenv()
@@ -49,10 +50,15 @@ def get_azure_clients():
     )
     
     # Restored back to the native implementation (removes the unstable custom injector)
+   # Instantiate a clean config mapping to completely override automated environment tracking
+    config = Configuration()
+
+    # Pass the blank config block explicitly to clear out hidden timeout parameters
     doc_cl = DocumentIntelligenceClient(
         endpoint=str(doc_endpoint), 
         credential=AzureKeyCredential(str(doc_key)),
-        api_version="2024-11-30"
+        api_version="2024-11-30",
+        config=config  # <-- Injects the clean configuration mapping override
     )
     
     return openai_cl, search_cl, doc_cl
