@@ -5,9 +5,8 @@ from openai import AzureOpenAI
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
-from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 
-# Load our secret environment keys
+# Load our secret environment keys locally
 load_dotenv()
 
 # ==============================================================================
@@ -24,19 +23,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Fully Patched for Streamlit Cloud SDK)
-# ==============================================================================
-@st.cache_resource
-# ==============================================================================
-# ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Final Cloud-Ready Version)
-# ==============================================================================
-# ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Production-Grade Verification)
+# 2. INITIALIZE CLIENT CONNECTIONS (Production Cloud Patched)
 # ==============================================================================
 def get_azure_clients():
-    # Direct extraction matching your exact code fields
+    # Direct extraction matching environment keys or Streamlit Advanced Secrets fields
     openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
     openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY")
     
@@ -47,16 +37,17 @@ def get_azure_clients():
     doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
     doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
 
-    # Initialize client instances with explicit string parameters
+    # Initialize client instances with explicit parameters
     openai_cl = AzureOpenAI(
         azure_endpoint=str(openai_endpoint),
         api_key=str(openai_key),
         api_version="2024-02-01"
     )
     
+    # PATCHED: Using 'index' instead of deprecated 'index_name' for modern SDK compatibility
     search_cl = SearchClient(
         endpoint=str(search_endpoint),
-        index_name=str(search_index),
+        index=str(search_index),
         credential=AzureKeyCredential(str(search_key))
     )
     
@@ -67,7 +58,7 @@ def get_azure_clients():
     
     return openai_cl, search_cl, doc_cl
 
-# Initialize clients seamlessly
+# Initialize connections seamlessly across execution frames
 openai_client, search_client, doc_client = get_azure_clients()
 
 def get_embedding(text):
@@ -90,11 +81,11 @@ with st.sidebar:
         if st.button("Extract & Index Knowledge Base"):
             with st.spinner("Document Intelligence reading PDF structure..."):
                 file_bytes = uploaded_file.getvalue()
-                request_body = AnalyzeDocumentRequest(bytes_source=file_bytes)
                 
+                # PATCHED: Simplified syntax. Passing raw bytes straight into analyze_request.
                 poller = doc_client.begin_analyze_document(
                     model_id="prebuilt-layout", 
-                    body=request_body
+                    analyze_request=file_bytes
                 )
                 result = poller.result()
                 
@@ -114,7 +105,6 @@ with st.sidebar:
                 for i, chunk in enumerate(chunks):
                     vector = get_embedding(chunk)
                     
-                    # Perfectly matches your newly updated portal fields!
                     documents.append({
                         "id": f"uploaded_doc_{i}",
                         "chunk": chunk,     
@@ -158,7 +148,12 @@ if user_query := st.chat_input("Ask a question about your uploaded notes..."):
                 top=3
             )
             
-            context = "\n\n".join([r["chunk"] for r in results])
+            # Extract retrieved text pieces cleanly from the vector payload
+            results_list = list(results)
+            if results_list:
+                context = "\n\n".join([r["chunk"] for r in results_list])
+            else:
+                context = "No relevant document fragments found matching the search criteria."
             
             system_prompt = (
                 "You are an expert academic tutor. Answer the user's questions using only the context provided below. "
