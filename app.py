@@ -29,14 +29,11 @@ st.markdown("""
 # ==============================================================================
 @st.cache_resource
 # ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Streamlined for Cloud Container Compatibility)
 # ==============================================================================
-# Removed @st.cache_resource to prevent internal thread-hashing validation crashes
-# ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Production Cloud Fixed)
+# 2. INITIALIZE CLIENT CONNECTIONS (Final Cloud-Ready Version)
 # ==============================================================================
 def get_azure_clients():
-    # Correctly resolve variables using simple fallbacks without hardcoding empty strings
+    # Streamlit Cloud safely resolves st.secrets keys into standard env variables under the hood
     openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
     openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY")
     
@@ -47,7 +44,6 @@ def get_azure_clients():
     doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
     doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
 
-    # Clean, direct instantiation using resolved values
     openai_cl = AzureOpenAI(
         azure_endpoint=openai_endpoint,
         api_key=openai_key,
