@@ -51,9 +51,13 @@ def get_azure_clients():
         credential=AzureKeyCredential(str(search_key))
     )
     
+   # --------------------------------------------------------------------------
+    # FIXED: Added explicit api_version to bypass Azure API routing 404s
+    # --------------------------------------------------------------------------
     doc_cl = DocumentIntelligenceClient(
         endpoint=str(doc_endpoint), 
-        credential=AzureKeyCredential(str(doc_key))
+        credential=AzureKeyCredential(str(doc_key)),
+        api_version="2024-11-30"  # <-- Add this parameter line exactly
     )
     
     return openai_cl, search_cl, doc_cl
