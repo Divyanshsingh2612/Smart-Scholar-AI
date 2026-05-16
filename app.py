@@ -32,8 +32,11 @@ st.markdown("""
 # ==============================================================================
 # 2. INITIALIZE CLIENT CONNECTIONS (Final Cloud-Ready Version)
 # ==============================================================================
+# ==============================================================================
+# 2. INITIALIZE CLIENT CONNECTIONS (Production-Grade Verification)
+# ==============================================================================
 def get_azure_clients():
-    # Streamlit Cloud safely resolves st.secrets keys into standard env variables under the hood
+    # Direct extraction matching your exact code fields
     openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
     openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY")
     
@@ -44,26 +47,27 @@ def get_azure_clients():
     doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
     doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
 
+    # Initialize client instances with explicit string parameters
     openai_cl = AzureOpenAI(
-        azure_endpoint=openai_endpoint,
-        api_key=openai_key,
+        azure_endpoint=str(openai_endpoint),
+        api_key=str(openai_key),
         api_version="2024-02-01"
     )
     
     search_cl = SearchClient(
-        endpoint=search_endpoint,
-        index_name=search_index,
-        credential=AzureKeyCredential(search_key)
+        endpoint=str(search_endpoint),
+        index_name=str(search_index),
+        credential=AzureKeyCredential(str(search_key))
     )
     
     doc_cl = DocumentIntelligenceClient(
-        endpoint=doc_endpoint, 
-        credential=AzureKeyCredential(doc_key)
+        endpoint=str(doc_endpoint), 
+        credential=AzureKeyCredential(str(doc_key))
     )
     
     return openai_cl, search_cl, doc_cl
 
-# Call initialization normally
+# Initialize clients seamlessly
 openai_client, search_client, doc_client = get_azure_clients()
 
 def get_embedding(text):
