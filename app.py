@@ -5,9 +5,7 @@ from openai import AzureOpenAI
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
-from azure.core.pipeline.transport import HttpTransport
-from azure.core.pipeline.transport import RequestsTransport 
-from azure.core.pipeline.transport import AioHttpTransport
+
 # Load secret environment keys locally
 load_dotenv()
 
@@ -25,32 +23,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS 
+# 2. INITIALIZE CLIENT CONNECTIONS (Clean & Streamlined)
 # ==============================================================================
-# ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Asynchronous Transport Aligned)
-# ==============================================================================
-# ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Custom Timeout Stripping Bypass)
-# ==============================================================================
-class SafeRequestsSessionInjector:
-    """
-    Custom request wrapper that explicitly strips problematic timeout keywords 
-    to prevent deep underlying TypeErrors within the Streamlit container.
-    """
-    def __init__(self):
-        import requests
-        self.session = requests.Session()
-    
-    def send(self, request, **kwargs):
-        # Explicitly remove parameters that cause clashing inside the container
-        kwargs.pop("read_timeout", None)
-        kwargs.pop("connection_timeout", None)
-        return self.session.send(request, **kwargs)
-        
-    def close(self):
-        self.session.close()
-
 def get_azure_clients():
     openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
     openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY")
@@ -74,13 +48,11 @@ def get_azure_clients():
         credential=AzureKeyCredential(str(search_key))
     )
     
-    # Instantiate Document Intelligence with our custom safe request bridge
-    # REMOVE any transport= imports from the top of your file to clean it up
+    # Restored back to the native implementation (removes the unstable custom injector)
     doc_cl = DocumentIntelligenceClient(
         endpoint=str(doc_endpoint), 
         credential=AzureKeyCredential(str(doc_key)),
-        api_version="2024-11-30",
-        transport=SafeRequestsSessionInjector()  # <-- Injects our safe interceptor
+        api_version="2024-11-30"
     )
     
     return openai_cl, search_cl, doc_cl
@@ -109,17 +81,21 @@ with st.sidebar:
             with st.spinner("Document Intelligence reading PDF structure..."):
                 file_bytes = uploaded_file.getvalue()
                 
-                # Handing raw bytes straight into explicit 'bytes_source' parameters
+                # FINAL FIX: Bypassing timeout keys via connection configuration fields
                 try:
                     poller = doc_client.begin_analyze_document(
                         model_id="prebuilt-layout", 
-                        bytes_source=file_bytes
+                        bytes_source=file_bytes,
+                        connection_timeout=None,  # Nullifying deep parameters directly at the call level
+                        read_timeout=None
                     )
                     result = poller.result()
                 except Exception:
                     poller = doc_client.begin_analyze_document(
                         model_id="prebuilt-document", 
-                        bytes_source=file_bytes
+                        bytes_source=file_bytes,
+                        connection_timeout=None,
+                        read_timeout=None
                     )
                     result = poller.result()
                 
