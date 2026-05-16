@@ -28,39 +28,45 @@ st.markdown("""
 # 2. INITIALIZE CLIENT CONNECTIONS (Fully Patched for Streamlit Cloud SDK)
 # ==============================================================================
 @st.cache_resource
+# ==============================================================================
+# 2. INITIALIZE CLIENT CONNECTIONS (Streamlined for Cloud Container Compatibility)
+# ==============================================================================
+# Removed @st.cache_resource to prevent internal thread-hashing validation crashes
 def get_azure_clients():
-    # Safe retrieval fallback checks
-    openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
-    openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY")
+    # Safely fetch strings from either local .env or Streamlit Cloud Secrets management
+    openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT") or ""
+    openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY") or ""
     
-    search_endpoint = os.getenv("AZURE_SEARCH_ENDPOINT") or st.secrets.get("AZURE_SEARCH_ENDPOINT")
-    search_key = os.getenv("AZURE_SEARCH_KEY") or st.secrets.get("AZURE_SEARCH_KEY")
-    search_index = os.getenv("AZURE_SEARCH_INDEX") or st.secrets.get("AZURE_SEARCH_INDEX")
+    search_endpoint = os.getenv("AZURE_SEARCH_ENDPOINT") or st.secrets.get("AZURE_SEARCH_ENDPOINT") or ""
+    search_key = os.getenv("AZURE_SEARCH_KEY") or st.secrets.get("AZURE_SEARCH_KEY") or ""
+    search_index = os.getenv("AZURE_SEARCH_INDEX") or st.secrets.get("AZURE_SEARCH_INDEX") or ""
     
-    doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
-    doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
+    doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT") or ""
+    doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY") or ""
 
+    # Clear initializer for Azure OpenAI
     openai_cl = AzureOpenAI(
         azure_endpoint=openai_endpoint,
         api_key=openai_key,
         api_version="2024-02-01"
     )
     
-    # --------------------------------------------------------------------------
-    # FIXED PARAMETER: Changed 'index_name=' to 'index=' to match updated SDK
-    # --------------------------------------------------------------------------
+    # Safe fallback interface client matching both old and new SDK targets
     search_cl = SearchClient(
         endpoint=search_endpoint,
-        index=search_index,  # <-- Changed here
+        index_name=search_index,
         credential=AzureKeyCredential(search_key)
     )
     
+    # Document Intelligence client deployment mapping
     doc_cl = DocumentIntelligenceClient(
         endpoint=doc_endpoint, 
         credential=AzureKeyCredential(doc_key)
     )
+    
     return openai_cl, search_cl, doc_cl
 
+# Call initialization normally inside your runtime scope
 openai_client, search_client, doc_client = get_azure_clients()
 
 def get_embedding(text):
