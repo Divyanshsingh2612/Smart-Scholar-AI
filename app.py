@@ -6,7 +6,7 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 
-# Load our secret environment keys locally
+# Load secret environment keys locally
 load_dotenv()
 
 # ==============================================================================
@@ -23,7 +23,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Production Cloud Patched)
+# 2. INITIALIZE CLIENT CONNECTIONS 
 # ==============================================================================
 def get_azure_clients():
     # Direct extraction matching environment keys or Streamlit Advanced Secrets fields
@@ -37,17 +37,17 @@ def get_azure_clients():
     doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
     doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
 
-    # Initialize client instances with explicit parameters
+    # Initialize client instances with explicit string conversion strings
     openai_cl = AzureOpenAI(
         azure_endpoint=str(openai_endpoint),
         api_key=str(openai_key),
         api_version="2024-02-01"
     )
     
-    # PATCHED: Using 'index' instead of deprecated 'index_name' for modern SDK compatibility
+    # Matches the explicit version metrics expected by your system container
     search_cl = SearchClient(
         endpoint=str(search_endpoint),
-        index_name=str(search_index),  # Changed back to satisfy your current environment version
+        index_name=str(search_index),
         credential=AzureKeyCredential(str(search_key))
     )
     
@@ -58,7 +58,7 @@ def get_azure_clients():
     
     return openai_cl, search_cl, doc_cl
 
-# Initialize connections seamlessly across execution frames
+# Initialize connections seamlessly across runtime loops
 openai_client, search_client, doc_client = get_azure_clients()
 
 def get_embedding(text):
@@ -82,12 +82,19 @@ with st.sidebar:
             with st.spinner("Document Intelligence reading PDF structure..."):
                 file_bytes = uploaded_file.getvalue()
                 
-                # PATCHED: Simplified syntax. Passing raw bytes straight into analyze_request.
-                poller = doc_client.begin_analyze_document(
-                    model_id="prebuilt-layout", 
-                    analyze_request=file_bytes
-                )
-                result = poller.result()
+                # Built-in exception handling to fallback across resource tier constraints
+                try:
+                    poller = doc_client.begin_analyze_document(
+                        model_id="prebuilt-layout", 
+                        analyze_request=file_bytes
+                    )
+                    result = poller.result()
+                except Exception:
+                    poller = doc_client.begin_analyze_document(
+                        model_id="prebuilt-document", 
+                        analyze_request=file_bytes
+                    )
+                    result = poller.result()
                 
                 chunks = []
                 current_chunk = ""
@@ -148,7 +155,6 @@ if user_query := st.chat_input("Ask a question about your uploaded notes..."):
                 top=3
             )
             
-            # Extract retrieved text pieces cleanly from the vector payload
             results_list = list(results)
             if results_list:
                 context = "\n\n".join([r["chunk"] for r in results_list])
