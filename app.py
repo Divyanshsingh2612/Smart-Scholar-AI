@@ -30,8 +30,28 @@ st.markdown("""
 # ==============================================================================
 # 2. INITIALIZE CLIENT CONNECTIONS (Asynchronous Transport Aligned)
 # ==============================================================================
+# ==============================================================================
+# 2. INITIALIZE CLIENT CONNECTIONS (Custom Timeout Stripping Bypass)
+# ==============================================================================
+class SafeRequestsSessionInjector:
+    """
+    Custom request wrapper that explicitly strips problematic timeout keywords 
+    to prevent deep underlying TypeErrors within the Streamlit container.
+    """
+    def __init__(self):
+        import requests
+        self.session = requests.Session()
+    
+    def send(self, request, **kwargs):
+        # Explicitly remove parameters that cause clashing inside the container
+        kwargs.pop("read_timeout", None)
+        kwargs.pop("connection_timeout", None)
+        return self.session.send(request, **kwargs)
+        
+    def close(self):
+        self.session.close()
+
 def get_azure_clients():
-    # Direct extraction matching environment keys or Streamlit Advanced Secrets fields
     openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
     openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY")
     
@@ -54,19 +74,18 @@ def get_azure_clients():
         credential=AzureKeyCredential(str(search_key))
     )
     
-    # --------------------------------------------------------------------------
-    # FIXED: Forcing an isolated AioHttpTransport loop to drop request timeouts
-    # --------------------------------------------------------------------------
+    # Instantiate Document Intelligence with our custom safe request bridge
+    # REMOVE any transport= imports from the top of your file to clean it up
     doc_cl = DocumentIntelligenceClient(
         endpoint=str(doc_endpoint), 
         credential=AzureKeyCredential(str(doc_key)),
         api_version="2024-11-30",
-        transport=AioHttpTransport()  # <-- Clean, isolated network transport
+        transport=SafeRequestsSessionInjector()  # <-- Injects our safe interceptor
     )
     
     return openai_cl, search_cl, doc_cl
 
-# Initialize connections seamlessly across runtime loops
+# Initialize connections cleanly
 openai_client, search_client, doc_client = get_azure_clients()
 
 def get_embedding(text):
