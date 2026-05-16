@@ -26,21 +26,36 @@ st.markdown("""
 # ==============================================================================
 # 2. INITIALIZE CLIENT CONNECTIONS
 # ==============================================================================
+# ==============================================================================
+# 2. INITIALIZE CLIENT CONNECTIONS (Updated with Cloud Secrets Fallback)
+# ==============================================================================
 @st.cache_resource
 def get_azure_clients():
+    # Attempt to read standard OS environment variables, fallback to Streamlit Secrets dictionary
+    openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
+    openai_key = os.getenv("AZURE_OPENAI_KEY") or st.secrets.get("AZURE_OPENAI_KEY")
+    
+    search_endpoint = os.getenv("AZURE_SEARCH_ENDPOINT") or st.secrets.get("AZURE_SEARCH_ENDPOINT")
+    search_key = os.getenv("AZURE_SEARCH_KEY") or st.secrets.get("AZURE_SEARCH_KEY")
+    search_index = os.getenv("AZURE_SEARCH_INDEX") or st.secrets.get("AZURE_SEARCH_INDEX")
+    
+    doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
+    doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
+
+    # Initialize client initializers using the clean resolved parameters
     openai_cl = AzureOpenAI(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_KEY"),
+        azure_endpoint=openai_endpoint,
+        api_key=openai_key,
         api_version="2024-02-01"
     )
     search_cl = SearchClient(
-        endpoint=os.getenv("AZURE_SEARCH_ENDPOINT"),
-        index_name=os.getenv("AZURE_SEARCH_INDEX"),
-        credential=AzureKeyCredential(os.getenv("AZURE_SEARCH_KEY"))
+        endpoint=search_endpoint,
+        index_name=search_index,
+        credential=AzureKeyCredential(search_key)
     )
     doc_cl = DocumentIntelligenceClient(
-        endpoint=os.getenv("DOC_INTEL_ENDPOINT"), 
-        credential=AzureKeyCredential(os.getenv("DOC_INTEL_KEY"))
+        endpoint=doc_endpoint, 
+        credential=AzureKeyCredential(doc_key)
     )
     return openai_cl, search_cl, doc_cl
 
