@@ -51,13 +51,11 @@ def get_azure_clients():
         credential=AzureKeyCredential(str(search_key))
     )
     
-   # --------------------------------------------------------------------------
-    # FIXED: Added explicit api_version to bypass Azure API routing 404s
-    # --------------------------------------------------------------------------
+    # Pinned to a stable production API release to ensure gateway routing succeeds
     doc_cl = DocumentIntelligenceClient(
         endpoint=str(doc_endpoint), 
         credential=AzureKeyCredential(str(doc_key)),
-        api_version="2024-11-30"  # <-- Add this parameter line exactly
+        api_version="2024-11-30"
     )
     
     return openai_cl, search_cl, doc_cl
@@ -83,20 +81,20 @@ with st.sidebar:
     
     if uploaded_file is not None:
         if st.button("Extract & Index Knowledge Base"):
-           with st.spinner("Document Intelligence reading PDF structure..."):
+            with st.spinner("Document Intelligence reading PDF structure..."):
                 file_bytes = uploaded_file.getvalue()
                 
-                # Updated with explicit 'bytes_source' keywords required by the stable API version
+                # Handing raw bytes straight into explicit 'bytes_source' parameters
                 try:
                     poller = doc_client.begin_analyze_document(
                         model_id="prebuilt-layout", 
-                        bytes_source=file_bytes  # <-- Updated parameter keyword
+                        bytes_source=file_bytes
                     )
                     result = poller.result()
                 except Exception:
                     poller = doc_client.begin_analyze_document(
                         model_id="prebuilt-document", 
-                        bytes_source=file_bytes  # <-- Updated parameter keyword
+                        bytes_source=file_bytes
                     )
                     result = poller.result()
                 
