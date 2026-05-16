@@ -5,6 +5,7 @@ from openai import AzureOpenAI
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.core.pipeline.transport import HttpTransport
 
 # Load secret environment keys locally
 load_dotenv()
@@ -51,11 +52,13 @@ def get_azure_clients():
         credential=AzureKeyCredential(str(search_key))
     )
     
-    # Pinned to a stable production API release to ensure gateway routing succeeds
+    # Initialize Document Intelligence client with an isolated transport layer
+    # This prevents 'azure-core' from injecting incompatible timeout parameters into 'requests'
     doc_cl = DocumentIntelligenceClient(
         endpoint=str(doc_endpoint), 
         credential=AzureKeyCredential(str(doc_key)),
-        api_version="2024-11-30"
+        api_version="2024-11-30",
+        transport=HttpTransport()  # <-- Add this parameter line exactly
     )
     
     return openai_cl, search_cl, doc_cl
