@@ -83,20 +83,20 @@ with st.sidebar:
     
     if uploaded_file is not None:
         if st.button("Extract & Index Knowledge Base"):
-            with st.spinner("Document Intelligence reading PDF structure..."):
+           with st.spinner("Document Intelligence reading PDF structure..."):
                 file_bytes = uploaded_file.getvalue()
                 
-                # Built-in exception handling to fallback across resource tier constraints
+                # Updated with explicit 'bytes_source' keywords required by the stable API version
                 try:
                     poller = doc_client.begin_analyze_document(
                         model_id="prebuilt-layout", 
-                        analyze_request=file_bytes
+                        bytes_source=file_bytes  # <-- Updated parameter keyword
                     )
                     result = poller.result()
                 except Exception:
                     poller = doc_client.begin_analyze_document(
                         model_id="prebuilt-document", 
-                        analyze_request=file_bytes
+                        bytes_source=file_bytes  # <-- Updated parameter keyword
                     )
                     result = poller.result()
                 
