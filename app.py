@@ -47,7 +47,7 @@ def get_azure_clients():
     # PATCHED: Using 'index' instead of deprecated 'index_name' for modern SDK compatibility
     search_cl = SearchClient(
         endpoint=str(search_endpoint),
-        index=str(search_index),
+        index_name=str(search_index),  # Changed back to satisfy your current environment version
         credential=AzureKeyCredential(str(search_key))
     )
     
