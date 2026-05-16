@@ -6,7 +6,7 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.pipeline.transport import HttpTransport
-
+from azure.core.pipeline.transport import RequestsTransport 
 # Load secret environment keys locally
 load_dotenv()
 
@@ -58,7 +58,7 @@ def get_azure_clients():
         endpoint=str(doc_endpoint), 
         credential=AzureKeyCredential(str(doc_key)),
         api_version="2024-11-30",
-        transport=HttpTransport()  # <-- Add this parameter line exactly
+        transport=RequestsTransport()  # <-- Changed from HttpTransport() to RequestsTransport()
     )
     
     return openai_cl, search_cl, doc_cl
