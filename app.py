@@ -7,6 +7,7 @@ from azure.search.documents import SearchClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.pipeline.transport import HttpTransport
 from azure.core.pipeline.transport import RequestsTransport 
+from azure.core.pipeline.transport import AioHttpTransport
 # Load secret environment keys locally
 load_dotenv()
 
@@ -26,6 +27,9 @@ st.markdown("""
 # ==============================================================================
 # 2. INITIALIZE CLIENT CONNECTIONS 
 # ==============================================================================
+# ==============================================================================
+# 2. INITIALIZE CLIENT CONNECTIONS (Asynchronous Transport Aligned)
+# ==============================================================================
 def get_azure_clients():
     # Direct extraction matching environment keys or Streamlit Advanced Secrets fields
     openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
@@ -38,27 +42,26 @@ def get_azure_clients():
     doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
     doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
 
-    # Initialize client instances with explicit string conversion strings
     openai_cl = AzureOpenAI(
         azure_endpoint=str(openai_endpoint),
         api_key=str(openai_key),
         api_version="2024-02-01"
     )
     
-    # Matches the explicit version metrics expected by your system container
     search_cl = SearchClient(
         endpoint=str(search_endpoint),
         index_name=str(search_index),
         credential=AzureKeyCredential(str(search_key))
     )
     
-    # Initialize Document Intelligence client with an isolated transport layer
-    # This prevents 'azure-core' from injecting incompatible timeout parameters into 'requests'
+    # --------------------------------------------------------------------------
+    # FIXED: Forcing an isolated AioHttpTransport loop to drop request timeouts
+    # --------------------------------------------------------------------------
     doc_cl = DocumentIntelligenceClient(
         endpoint=str(doc_endpoint), 
         credential=AzureKeyCredential(str(doc_key)),
         api_version="2024-11-30",
-        transport=RequestsTransport()  # <-- Changed from HttpTransport() to RequestsTransport()
+        transport=AioHttpTransport()  # <-- Clean, isolated network transport
     )
     
     return openai_cl, search_cl, doc_cl
