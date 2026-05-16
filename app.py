@@ -1,11 +1,11 @@
 import os
+import time
+import requests
 from dotenv import load_dotenv
 import streamlit as st
 from openai import AzureOpenAI
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
-from azure.ai.documentintelligence import DocumentIntelligenceClient
-from azure.core.configuration import Configuration
 
 # Load secret environment keys locally
 load_dotenv()
@@ -24,7 +24,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. INITIALIZE CLIENT CONNECTIONS (Clean & Streamlined)
+# 2. INITIALIZE CLIENT CONNECTIONS
 # ==============================================================================
 def get_azure_clients():
     openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT") or st.secrets.get("AZURE_OPENAI_ENDPOINT")
@@ -34,9 +34,6 @@ def get_azure_clients():
     search_key = os.getenv("AZURE_SEARCH_KEY") or st.secrets.get("AZURE_SEARCH_KEY")
     search_index = os.getenv("AZURE_SEARCH_INDEX") or st.secrets.get("AZURE_SEARCH_INDEX")
     
-    doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
-    doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
-
     openai_cl = AzureOpenAI(
         azure_endpoint=str(openai_endpoint),
         api_key=str(openai_key),
@@ -49,22 +46,10 @@ def get_azure_clients():
         credential=AzureKeyCredential(str(search_key))
     )
     
-    # Restored back to the native implementation (removes the unstable custom injector)
-   # Instantiate a clean config mapping to completely override automated environment tracking
-    config = Configuration()
-
-    # Pass the blank config block explicitly to clear out hidden timeout parameters
-    doc_cl = DocumentIntelligenceClient(
-        endpoint=str(doc_endpoint), 
-        credential=AzureKeyCredential(str(doc_key)),
-        api_version="2024-11-30",
-        config=config  # <-- Injects the clean configuration mapping override
-    )
-    
-    return openai_cl, search_cl, doc_cl
+    return openai_cl, search_cl
 
 # Initialize connections cleanly
-openai_client, search_client, doc_client = get_azure_clients()
+openai_client, search_client = get_azure_clients()
 
 def get_embedding(text):
     response = openai_client.embeddings.create(
@@ -74,7 +59,7 @@ def get_embedding(text):
     return response.data[0].embedding
 
 # ==============================================================================
-# 3. SIDEBAR / DOCUMENT UPLOADER LAYOUT
+# 3. SIDEBAR / DOCUMENT UPLOADER LAYOUT (Bypassed via REST)
 # ==============================================================================
 with st.sidebar:
     st.title("⚙️ Management Panel")
@@ -87,29 +72,58 @@ with st.sidebar:
             with st.spinner("Document Intelligence reading PDF structure..."):
                 file_bytes = uploaded_file.getvalue()
                 
-                # FINAL FIX: Bypassing timeout keys via connection configuration fields
-                try:
-                    poller = doc_client.begin_analyze_document(
-                        model_id="prebuilt-layout", 
-                        bytes_source=file_bytes,
-                        connection_timeout=None,  # Nullifying deep parameters directly at the call level
-                        read_timeout=None
-                    )
-                    result = poller.result()
-                except Exception:
-                    poller = doc_client.begin_analyze_document(
-                        model_id="prebuilt-document", 
-                        bytes_source=file_bytes,
-                        connection_timeout=None,
-                        read_timeout=None
-                    )
-                    result = poller.result()
+                # Fetch targets directly from secrets/env
+                doc_endpoint = os.getenv("DOC_INTEL_ENDPOINT") or st.secrets.get("DOC_INTEL_ENDPOINT")
+                doc_key = os.getenv("DOC_INTEL_KEY") or st.secrets.get("DOC_INTEL_KEY")
                 
+                # Strip trailing slash if present
+                doc_endpoint = str(doc_endpoint).rstrip("/")
+                
+                # Construct the pure REST API URL target 
+                rest_url = f"{doc_endpoint}/documentintelligence/documentModels/prebuilt-layout:analyze?api-version=2024-11-30"
+                
+                headers = {
+                    "Ocp-Apim-Subscription-Key": str(doc_key),
+                    "Content-Type": "application/octet-stream"
+                }
+                
+                # Step A: POST the raw bytes directly to Azure REST Gateway
+                response = requests.post(rest_url, headers=headers, data=file_bytes)
+                
+                if response.status_code != 202:
+                    # Fallback to alternative model endpoint if layout is restricted
+                    rest_url = f"{doc_endpoint}/documentintelligence/documentModels/prebuilt-document:analyze?api-version=2024-11-30"
+                    response = requests.post(rest_url, headers=headers, data=file_bytes)
+                
+                if response.status_code != 202:
+                    st.error(f"Azure Connection Rejected Request: {response.text}")
+                    st.stop()
+                
+                # Step B: Poll the Operation-Location URL header for extraction results
+                operation_url = response.headers["Operation-Location"]
+                
+                while True:
+                    status_response = requests.get(operation_url, headers={"Ocp-Apim-Subscription-Key": str(doc_key)})
+                    status_data = status_response.json()
+                    
+                    if status_data.get("status") == "succeeded":
+                        analyze_result = status_data.get("analyzeResult", {})
+                        break
+                    elif status_data.get("status") == "failed":
+                        st.error("Azure Document Processing Failed.")
+                        st.stop()
+                    
+                    time.sleep(1)
+                
+                # Step C: Parse extracted text chunks cleanly from the json result payload
                 chunks = []
                 current_chunk = ""
-                for page in result.pages:
-                    for line in page.lines:
-                        current_chunk += line.content + " "
+                pages = analyze_result.get("pages", [])
+                
+                for page in pages:
+                    lines = page.get("lines", [])
+                    for line in lines:
+                        current_chunk += line.get("content", "") + " "
                         if len(current_chunk) > 1000:
                             chunks.append(current_chunk.strip())
                             current_chunk = ""
